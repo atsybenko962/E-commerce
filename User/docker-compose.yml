@@ -1,0 +1,42 @@
+networks:
+  commerce_network:
+    driver: bridge
+
+services:
+  user_db:
+    container_name: user_db
+    restart: always
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    env_file:
+      - .env
+    ports:
+      - "${USER_DB_PORT}:${DB_PORT}"
+    volumes:
+      - "./data/postgres:/var/lib/postgresql/data:rw"
+    healthcheck:
+      test: pg_isready -U ${DB_USER} -d ${DB_NAME}
+      interval: 2s
+      timeout: 10s
+      retries: 2
+    networks:
+      - commerce_network
+
+  user_migrator:
+    container_name: user_migrator
+    image: ghcr.io/kukymbr/goose-docker:3.22.1
+    environment:
+      - GOOSE_DRIVER=${GOOSE_DRIVER}
+      - GOOSE_DBSTRING=host=${DB_HOST} port=${DB_PORT} user=${DB_USER} password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=${SSL_MODE}
+    volumes:
+      - ./migrations:/migrations
+    restart: on-failure
+    env_file:
+      - ./.env
+    depends_on:
+      - user_db
+    networks:
+      - commerce_network
